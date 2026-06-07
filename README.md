@@ -72,6 +72,7 @@ chmod +x install.sh
 ```bash
 ./install.sh
 ```
+ Jeśli projekt Ci się podoba, zostaw gwiazdkę! ⭐
 
 ---
 

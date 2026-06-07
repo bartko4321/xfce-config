@@ -75,6 +75,8 @@ chmod +x install.sh
 
 ---
 
+Wsparcie numer konta: 06291000060000000005038936
+
 ## ⚠️ Ważne uwagi
 
 > 🚨 **AUTOREBOOT:** Po pomyślnym zakończeniu wszystkich konfiguracji, skrypt automatycznie wykona restart komputera (`systemctl reboot`), aby wszystkie zmiany (w tym LightDM i AccountsService) zostały poprawnie załadowane. Zapisz swoją pracę przed uruchomieniem skryptu!

@@ -58,15 +58,19 @@ Before running the script, make sure the following files and folders are present
 ### 1. Clone the repository or download the files
 ```bash
 git clone https://github.com/bartko4321/xfce-config.git
+```
+
+### 2. Enter the downloaded folder:
+```bash
 cd xfce-config
 ```
 
-### 2. Make the script executable
+### 3. Make the script executable
 ```bash
 chmod +x install.sh
 ```
 
-### 3. Run the script
+### 4. Run the script
 > ⚠️ **IMPORTANT:** Run the script as a **regular user** (NOT as root/sudo). The script will ask for the administrator password at the start to configure temporary elevated privileges.
 
 ```bash

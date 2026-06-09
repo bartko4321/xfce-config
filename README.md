@@ -1,83 +1,69 @@
-# 🚀 Skrypt Automatycznej Konfiguracji Środowiska XFCE
+# 🚀 XFCE Environment Automatic Configuration Script
 
-Skrypt powdrożeniowy (`install.sh`), który automatyzuje proces personalizacji systemu Linux (ze szczególnym uwzględnieniem środowiska **XFCE** oraz menedżera logowania **LightDM**). Kopiuje pliki konfiguracyjne, ustawia motywy, ikony, tapety oraz avatar użytkownika.
-
----
-
-## 📋 Spis treści
-1. [Funkcje skryptu](#-funkcje-skryptu)
-2. [Wymagana struktura katalogów](#-wymagana-struktura-katalogów)
-3. [Wymagania wstępne](#-wymagania-wstępne)
-4. [Instrukcja uruchomienia](#-instrukcja-uruchomienia)
-5. [⚠️ Ważne uwagi](#️-ważne-uwagi)
+A post-deployment script (`install.sh`) that automates the process of customizing a Linux system (with a specific focus on the **XFCE** desktop environment and the **LightDM** login manager). It copies configuration files, sets themes, icons, wallpapers, and the user's avatar.
 
 ---
 
-## ✨ Funkcje skryptu
-
-### 🎨 Konfiguracja wizualna (Użytkownik)
-* **Kopiowanie dotychczasowej konfiguracji:** Przenosi foldery `.config`, `.local/share`, `.icons` oraz `.themes` bezpośrednio do Twojego katalogu domowego (`~`).
-* **Automatyczna zmiana tapety:** Kopiuje plik `tapeta.jpg` do folderu `~/Dokumenty` i aplikuje go jako tło pulpitu XFCE za pomocą `xfconf-query`.
-* **Aktualizacja ścieżek (Username Fix):** Przeszukuje pliki `.conf`, `.json` oraz `.ini`, automatycznie podmieniając zakodowaną na sztywno ścieżkę starego użytkownika (`bartek`) na Twoją aktualną nazwę systemową.
-* **Avatar użytkownika:** Ustawia plik `piwo.png` jako Twój oficjalny avatar w systemie (poprzez integrację z `AccountsService`).
-
-### ⚙️ Konfiguracja systemowa (Sudo)
-* **Ekran logowania (LightDM):** Kopiuje `login-wallpaper.png` do bezpiecznej lokalizacji systemowej i ustawia go jako tło ekranu powitalnego w `lightdm-gtk-greeter.conf`.
-* **Podtrzymanie sesji sudo:** Skrypt prosi o hasło administratora tylko raz na początku, a następnie automatycznie odświeża uprawnienia w tle, aby proces nie zaciął się podczas pracy.
+## 📋 Table of Contents
+1. [Script Features](#-script-features)
+2. [Required Directory Structure](#-required-directory-structure)
+3. [Prerequisites](#-prerequisites)
+4. [How to Run](#-how-to-run)
+5. [⚠️ Important Notes](#️-important-notes)
 
 ---
 
-## 📁 Wymagana struktura katalogów
+## ✨ Script Features
 
-Aby skrypt zadziałał poprawnie, przed jego uruchomieniem upewnij się, że w tym samym katalogu znajdują się odpowiednie pliki i foldery:
+### 🎨 Visual Configuration (User)
+* **Copying existing configuration:** Moves the `.config`, `.local/share`, `.icons`, and `.themes` folders directly to your home directory (`~`).
+* **Automatic wallpaper change:** Copies the `tapeta.jpg` file to the `~/Dokumenty` (Documents) folder and applies it as the XFCE desktop background using `xfconf-query`.
+* **Path update (Username Fix):** Searches through `.conf`, `.json`, and `.ini` files, automatically replacing the hardcoded path of the old user (`bartek`) with your current system username.
+* **User avatar:** Sets the `piwo.png` file as your official system avatar (via integration with `AccountsService`).
+
+### ⚙️ System Configuration (Sudo)
+* **Login screen (LightDM):** Copies `login-wallpaper.png` to a secure system location and sets it as the greeter screen background in `lightdm-gtk-greeter.conf`.
+* **Sudo session keep-alive:** The script asks for the administrator password only once at the beginning, and then automatically refreshes permissions in the background so the process doesn't stall during execution.
+
+---
+
+## 📁 Required Directory Structure
+
+For the script to work correctly, make sure the following files and folders are located in the same directory before running it:
 
 ```text
 .
-├── install.sh              # Ten skrypt
-├── tapeta.jpg              # Tapeta na pulpit użytkownika
-├── piwo.png                # Avatar użytkownika (AccountsService)
-├── login-wallpaper.png     # Tapeta na ekran logowania LightDM
-├── .config/                # (Opcjonalnie) Twoje pliki konfiguracyjne aplikacji
-├── .local/share/           # (Opcjonalnie) Dane lokalne aplikacji, czcionki itp.
-├── .icons/                 # (Opcjonalnie) Twoje paczki ikon
-└── .themes/                # (Opcjonalnie) Twoje motywy GTK/XFWM
-```
+├── install.sh              # This script
+├── tapeta.jpg              # User desktop wallpaper
+├── piwo.png                # User avatar (AccountsService)
+├── login-wallpaper.png     # LightDM login screen wallpaper
+├── .config/                # (Optional) Your application configuration files
+├── .local/share/           # (Optional) Local application data, fonts, etc.
+├── .icons/                 # (Optional) Your icon packs
+└── .themes/                # (Optional) Your GTK/XFWM themes
+🔍 Prerequisites
+A Linux-based operating system (XFCE environment recommended).
 
----
+LightDM login manager with lightdm-gtk-greeter installed.
 
-## 🔍 Wymagania wstępne
+A user with privileges to use the sudo command.
 
-* System operacyjny z rodziny Linux (rekomendowane środowisko **XFCE**).
-* Menedżer logowania **LightDM** wraz z zainstalowanym `lightdm-gtk-greeter`.
-* Użytkownik z uprawnieniami do używania polecenia `sudo`.
-
----
-
-## 🚀 Instrukcja uruchomienia
-
-### 1. Sklonuj repozytorium lub pobierz pliki
-```bash
-git clone https://github.com/bartko4321/xfce-config.git
+🚀 How to Run
+1. Clone the repository or download the files
+Bash
+git clone [https://github.com/bartko4321/xfce-config.git](https://github.com/bartko4321/xfce-config.git)
 cd xfce-config
-```
-
-### 2. Nadaj uprawnienia do uruchomienia skryptu
-```bash
+2. Grant execution privileges to the script
+Bash
 chmod +x install.sh
-```
+3. Run the script
+⚠️ IMPORTANT: The script must be run as a regular user (NOT as root/sudo). The script will ask for the administrator password at the beginning to configure temporary privileges.
 
-### 3. Uruchom skrypt
-> ⚠️ **WAŻNE:** Skrypt należy uruchomić jako **zwykły użytkownik** (NIE jako root/sudo). Skrypt sam poprosi o hasło administratora na początku, aby skonfigurować tymczasowe uprawnienia.
-
-```bash
+Bash
 ./install.sh
-```
- Jeśli projekt Ci się podoba, zostaw gwiazdkę! ⭐
+If you like this project, leave a star! ⭐
 
----
+Support account number: 06291000060000000005038936
 
-Wsparcie numer konta: 06291000060000000005038936
-
-## ⚠️ Ważne uwagi
-
-> 🚨 **AUTOREBOOT:** Po pomyślnym zakończeniu wszystkich konfiguracji, skrypt automatycznie wykona restart komputera (`systemctl reboot`), aby wszystkie zmiany (w tym LightDM i AccountsService) zostały poprawnie załadowane. Zapisz swoją pracę przed uruchomieniem skryptu!
+⚠️ Important Notes
+🚨 AUTOREBOOT: After successfully completing all configurations, the script will automatically reboot the computer (systemctl reboot) so that all changes (including LightDM and AccountsService) are correctly loaded. Save your work before running the script!

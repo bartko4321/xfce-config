@@ -60,7 +60,7 @@ Before running the script, make sure the following files and folders are present
 git clone https://github.com/bartko4321/xfce-config.git
 ```
 
-### 2. Enter the downloaded folder:
+### 2. Enter the downloaded folder
 ```bash
 cd xfce-config
 ```

@@ -27,24 +27,6 @@ A post-installation script (`install.sh`) that automates the process of personal
 
 ---
 
-## 📁 Required Directory Structure
-
-Before running the script, make sure the following files and folders are present in the same directory:
-
-```text
-.
-├── install.sh              # This script
-├── tapeta.jpg              # Desktop wallpaper
-├── piwo.png                # User avatar (AccountsService)
-├── login-wallpaper.png     # LightDM login screen wallpaper
-├── .config/                # (Optional) Application config files
-├── .local/share/           # (Optional) Local app data, fonts, etc.
-├── .icons/                 # (Optional) Icon packs
-└── .themes/                # (Optional) GTK/XFWM themes
-```
-
----
-
 ## 🔍 Prerequisites
 
 * A Linux-based operating system (**XFCE** desktop environment recommended).

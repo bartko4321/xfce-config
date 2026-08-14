@@ -18,9 +18,7 @@ detect_system_lang() {
 SCRIPT_LANG="$(detect_system_lang)"
 
 # ── Kolory ────────────────────────────────────────────────────
-INFO='\033[0;34m'
 SUCCESS='\033[0;32m'
-WARN='\033[0;33m'
 ERR='\033[0;31m'
 NC='\033[0m'
 
@@ -54,19 +52,19 @@ wallpaper_PATH="$USER_PICTURES_DIR/wallpaper.jpg"
 LOGIN_WALLPAPER_PATH="/usr/share/backgrounds/custom/login-wallpaper.png"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# ── System logowania i ukrywanie komunikatów ──────────────────
+# ── Ukrywanie komunikatów i tworzenie logu błędów ─────────────
 TMP_LOG="$(mktemp /tmp/install-log.XXXXXX)"
 LOG_FILE="$HOME/install_error_$(date +%Y%m%d_%H%M%S).log"
 
-# fd 3 = terminal (używany WYŁĄCZNIE dla paska postępu i pytania końcowego)
+# fd 3 = terminal (używany WYŁĄCZNIE dla paska postępu i pytań)
 exec 3>&1
-exec >>"$TMP_LOG" 2>&1
+exec >"$TMP_LOG" 2>&1
 
 cleanup_on_exit() {
     local exit_code=$?
     if [ "$exit_code" -ne 0 ]; then
-        echo -e "\n" >&3
         cp -f "$TMP_LOG" "$LOG_FILE" 2>/dev/null || true
+        echo -e "\n" >&3
         if [[ "$SCRIPT_LANG" == "pl" ]]; then
             echo -e "${ERR}✘ Wystąpił błąd (kod: $exit_code). Szczegółowy log zapisano w: $LOG_FILE${NC}" >&3
         else
@@ -74,17 +72,9 @@ cleanup_on_exit() {
         fi
     fi
     sudo rm -f /etc/sudoers.d/99-temp-installer 2>/dev/null || true
-    rm -f "$TMP_LOG"
+    rm -f "$TMP_LOG" 2>/dev/null || true
 }
 trap cleanup_on_exit EXIT
-
-# Funkcje logujące w tle (zapisują tylko do ukrytego pliku)
-log_info()  { echo -e "${INFO}==> $*${NC}"; }
-log_ok()    { echo -e "${SUCCESS}✔ $*${NC}"; }
-log_err()   { echo -e "${ERR}✖ BŁĄD: $*${NC}" >&2; }
-log_warn()  { echo -e "${WARN}⚠ UWAGA: $*${NC}"; }
-
-trap 'log_warn "Błąd w linii $LINENO. Polecenie: $BASH_COMMAND — kontynuuję"' ERR
 
 # ── Funkcja rysująca pasek postępu ─────────────────────────────
 show_progress() {
@@ -120,7 +110,6 @@ TOTAL_STEPS=6
 # 1. KOPIOWANIE PLIKÓW KONFIGURACYJNYCH
 # ==========================================================
 show_progress 0 $TOTAL_STEPS "$MSG_PHASE_1"
-log_info "Rozpoczynam konfigurację wizualną użytkownika..."
 
 if [[ -d "$SCRIPT_DIR/.config" ]] && [[ "$(realpath "$SCRIPT_DIR/.config")" != "$(realpath ~/.config)" ]]; then
     cp -af "$SCRIPT_DIR/.config/." ~/.config/
@@ -146,7 +135,6 @@ if [[ -f "$SCRIPT_DIR/wallpaper.jpg" ]] && [[ "$(realpath "$SCRIPT_DIR/wallpaper
 fi
 
 if [[ "$OLD_USER_PLACEHOLDER" != "$CURRENT_USER" ]]; then
-    log_info "Aktualizuję ścieżki użytkownika w plikach konfiguracyjnych..."
     grep -rlZ --include="*.conf" --include="*.json" --include="*.ini" \
         "/home/$OLD_USER_PLACEHOLDER" ~/.config 2>/dev/null \
         | xargs -0 -r sed -i "s|/home/$OLD_USER_PLACEHOLDER|/home/$CURRENT_USER|g" || true
@@ -160,25 +148,39 @@ show_progress 2 $TOTAL_STEPS "$MSG_PHASE_1"
 show_progress 3 $TOTAL_STEPS "$MSG_PHASE_2"
 
 if command -v xfconf-query >/dev/null 2>&1; then
-    log_info "Ustawiam tapetę w systemie XFCE..."
-    DESKTOP_PROPS=$(xfconf-query -c xfce4-desktop -l 2>/dev/null | grep "last-image" || true)
 
-    if [[ -z "$DESKTOP_PROPS" ]]; then
-        log_warn "Brak właściwości last-image w xfce4-desktop — pomijam ustawienie tapety."
-    else
-        while IFS= read -r prop; do
-            xfconf-query -c xfce4-desktop -p "$prop" -s "$wallpaper_PATH" 2>/dev/null || log_warn "Nie udało się ustawić: $prop"
-        done <<< "$DESKTOP_PROPS"
-        log_ok "Tapeta XFCE została zaktualizowana."
+    # Ratowanie braku połączenia z DBUS (częsty błąd przy odpalaniu z tty/su)
+    if [[ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]]; then
+        SESSION_PID=$(pgrep -u "$CURRENT_USER" xfce4-session | head -n 1)
+        if [[ -n "$SESSION_PID" ]]; then
+            export DBUS_SESSION_BUS_ADDRESS=$(grep -z DBUS_SESSION_BUS_ADDRESS "/proc/$SESSION_PID/environ" 2>/dev/null | tr '\0' '\n' | grep ^DBUS_SESSION_BUS_ADDRESS= | cut -d= -f2-)
+        fi
     fi
-else
-    log_warn "xfconf-query nie znaleziony – pomijam automatyczną zmianę tapety."
+
+    # Szukamy obu standardów nazewnictwa właściwości tapety
+    DESKTOP_PROPS=$(xfconf-query -c xfce4-desktop -l 2>/dev/null | grep -E "last-image$|image-path$" || true)
+
+    if [[ -n "$DESKTOP_PROPS" ]]; then
+        # Usunięcie starych miniaturek i cache'u pulpitu
+        rm -f ~/.cache/xfce4/desktop/* 2>/dev/null || true
+
+        while IFS= read -r prop; do
+            # Ustawienie pustej/fałszywej wartości wymusza na demona odnotowanie zmiany tekstu
+            xfconf-query -c xfce4-desktop -p "$prop" -t string -s "/dev/null" 2>/dev/null || true
+            # Właściwe ustawienie tapety docelowej
+            xfconf-query -c xfce4-desktop -p "$prop" -t string -s "$wallpaper_PATH" 2>/dev/null || true
+        done <<< "$DESKTOP_PROPS"
+
+        # Wymuszenie przeładowania tła od razu bez czekania na restart
+        if command -v xfdesktop >/dev/null 2>&1; then
+            xfdesktop --reload &>/dev/null || true
+        fi
+    fi
 fi
 
 show_progress 4 $TOTAL_STEPS "$MSG_PHASE_2"
 
 if [[ -f "$SCRIPT_DIR/piwo.png" ]]; then
-    log_info "Ustawiam avatar użytkownika..."
     AVATAR_DEST="/var/lib/AccountsService/icons/$CURRENT_USER"
     sudo cp -af "$SCRIPT_DIR/piwo.png" "$AVATAR_DEST"
     sudo chmod 644 "$AVATAR_DEST"
@@ -197,9 +199,6 @@ if [[ -f "$SCRIPT_DIR/piwo.png" ]]; then
     else
         echo -e "[User]\nIcon=$AVATAR_DEST" | sudo tee "$ACCOUNTS_FILE" > /dev/null
     fi
-    log_ok "Avatar użytkownika został ustawiony."
-else
-    log_warn "Nie znaleziono pliku piwo.png — pomijam ustawienie avatara."
 fi
 
 # ==========================================================
@@ -207,7 +206,6 @@ fi
 # ==========================================================
 show_progress 5 $TOTAL_STEPS "$MSG_PHASE_3"
 
-log_info "Konfiguruję ekran logowania (LightDM)..."
 if [[ -f "$SCRIPT_DIR/login-wallpaper.png" ]]; then
     sudo mkdir -p /usr/share/backgrounds/custom
     sudo cp -af "$SCRIPT_DIR/login-wallpaper.png" "$LOGIN_WALLPAPER_PATH"
@@ -223,20 +221,12 @@ if [[ -f "$SCRIPT_DIR/login-wallpaper.png" ]]; then
         else
             sudo sed -i "/^\[greeter\]/a background=$LOGIN_WALLPAPER_PATH" /etc/lightdm/lightdm-gtk-greeter.conf
         fi
-        log_ok "Ekran logowania został skonfigurowany."
-    else
-        log_warn "Nie znaleziono pliku konfiguracyjnego LightDM GTK Greeter."
     fi
-else
-    log_warn "Nie znaleziono pliku login-wallpaper.png — pomijam tapetę ekranu logowania."
 fi
 
 if [ -d "$SCRIPT_DIR/bleachbit" ]; then
     sudo mkdir -p /root/.config/bleachbit
     sudo cp -af "$SCRIPT_DIR/bleachbit/." /root/.config/bleachbit/
-    log_ok "Skopiowano konfigurację BleachBit."
-else
-    log_warn "Folder $SCRIPT_DIR/bleachbit nie istnieje — pomijam."
 fi
 
 # Zakończenie paska postępu (100%)

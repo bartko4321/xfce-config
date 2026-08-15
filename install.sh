@@ -18,7 +18,16 @@ SCRIPT_LANG="$(detect_system_lang)"
 
 SUCCESS='\033[0;32m'
 ERR='\033[0;31m'
+INFO='\033[0;36m'
+WARN='\033[0;33m'
 NC='\033[0m'
+
+_pick_msg() { [[ "$SCRIPT_LANG" == "pl" ]] && echo "$1" || echo "$2"; }
+log_info() { echo -e "${INFO}==> $*${NC}"; }
+log_ok()   { echo -e "${SUCCESS}✔ $*${NC}"; }
+log_err()  { echo -e "${ERR}✖ $(_pick_msg "BŁĄD:" "ERROR:") $*${NC}" >&2; }
+log_warn() { echo -e "${WARN}⚠ $(_pick_msg "UWAGA:" "WARNING:") $*${NC}"; }
+trap 'log_err "$(_pick_msg "Błąd w linii $LINENO. Polecenie: $BASH_COMMAND" "Error at line $LINENO. Command: $BASH_COMMAND")"' ERR
 
 if [[ "$EUID" -eq 0 ]]; then
     if [[ "$SCRIPT_LANG" == "pl" ]]; then

@@ -5,7 +5,6 @@
 
 set -euo pipefail
 
-# ── Wykrywanie języka systemu ──────────────────────────────────
 detect_system_lang() {
     local sys_lang="${LANG:-}"
     [[ -z "$sys_lang" ]] && sys_lang="${LC_ALL:-${LC_MESSAGES:-}}"
@@ -17,12 +16,10 @@ detect_system_lang() {
 }
 SCRIPT_LANG="$(detect_system_lang)"
 
-# ── Kolory ────────────────────────────────────────────────────
 SUCCESS='\033[0;32m'
 ERR='\033[0;31m'
 NC='\033[0m'
 
-# ── Sprawdzenie uprawnień i Sudo ──────────────────────────────
 if [[ "$EUID" -eq 0 ]]; then
     if [[ "$SCRIPT_LANG" == "pl" ]]; then
         echo -e "${ERR}✘ Nie uruchamiaj skryptu jako root. Uruchom jako zwykły użytkownik z sudo.${NC}"
@@ -42,33 +39,25 @@ sudo -v || {
 }
 
 CURRENT_USER=$(whoami)
-# Tymczasowy wyjątek sudo (aby zapobiec blokadom na hasło w trakcie ukrytych zadań)
 echo "$CURRENT_USER ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/99-temp-installer > /dev/null
 
-# ── Zmienne XFCE i wielojęzyczne ścieżki XDG ──────────────────
 OLD_USER_PLACEHOLDER="bartek"
 USER_PICTURES_DIR="$(xdg-user-dir PICTURES 2>/dev/null || echo "$HOME/Pictures")"
 wallpaper_PATH="$USER_PICTURES_DIR/wallpaper.jpg"
 LOGIN_WALLPAPER_PATH="/usr/share/backgrounds/custom/login-wallpaper.png"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# ── Ukrywanie komunikatów i tworzenie logu błędów ─────────────
 TMP_LOG="$(mktemp /tmp/install-log.XXXXXX)"
 LOG_FILE="$HOME/install_error_$(date +%Y%m%d_%H%M%S).log"
 
-# fd 3 = terminal (używany WYŁĄCZNIE dla paska postępu i pytań)
 exec 3>&1
 exec >"$TMP_LOG" 2>&1
 
-# Wyłączamy zawijanie linii w terminalu na czas działania skryptu.
-# Bez tego zbyt długa linia paska postępu (pasek + komunikat) zawija się
-# na dwa wiersze terminala, a \r\033[K czyści tylko ten, na którym stoi
-# kursor — w efekcie na ekranie zostają "resztki" poprzedniego komunikatu.
 printf '\033[?7l' >&3
 
 cleanup_on_exit() {
     local exit_code=$?
-    printf '\033[?7h' >&3   # z powrotem włączamy zawijanie linii
+    printf '\033[?7h' >&3
     if [ "$exit_code" -ne 0 ]; then
         cp -f "$TMP_LOG" "$LOG_FILE" 2>/dev/null || true
         echo -e "\n" >&3
@@ -83,29 +72,23 @@ cleanup_on_exit() {
 }
 trap cleanup_on_exit EXIT
 
-# ── Funkcja rysująca pasek postępu ─────────────────────────────
 show_progress() {
     local step=$1
     local total=$2
     local msg=$3
     local percent=$(( step * 100 / total ))
 
-    # Szerokość terminala (fallback 80, gdyby tput się nie powiódł)
     local cols
     cols=$(tput cols 2>/dev/null)
     [[ "$cols" =~ ^[0-9]+$ ]] || cols=80
 
-    # Pasek ma maks. 50 znaków, ale kurczy się, jeśli terminal jest węższy.
     local bar_width=50
-    local reserved=12   # "[" + "]" + " 100% | " + margines bezpieczeństwa
+    local reserved=12
     if (( cols - reserved < bar_width )); then
         bar_width=$(( cols - reserved ))
         (( bar_width < 10 )) && bar_width=10
     fi
 
-    # Komunikat obcinamy tak, by cała linia zmieściła się w jednym wierszu
-    # terminala — dzięki temu \r\033[K zawsze czyści CAŁĄ poprzednią treść,
-    # zamiast zostawiać resztki po zawiniętej linii.
     local overhead=$(( bar_width + reserved ))
     local avail=$(( cols - overhead ))
     if (( avail < 5 )); then avail=5; fi
@@ -124,7 +107,6 @@ show_progress() {
     printf "\r\033[K[\033[1;32m%s\033[0;90m%s\033[0m] %3d%% | \033[1;36m%s\033[0m" "$bar_filled" "$bar_empty" "$percent" "$msg" >&3
 }
 
-# ── 3 GŁÓWNE KOMUNIKATY ────────────────────────────────────────
 if [[ "$SCRIPT_LANG" == "pl" ]]; then
     MSG_PHASE_1="[1/3] Kopiowanie plików konfiguracyjnych i motywów..."
     MSG_PHASE_2="[2/3] Konfiguracja środowiska XFCE i avatara..."
@@ -180,7 +162,6 @@ show_progress 3 $TOTAL_STEPS "$MSG_PHASE_2"
 
 if command -v xfconf-query >/dev/null 2>&1; then
 
-    # Ratowanie braku połączenia z DBUS (częsty błąd przy odpalaniu z tty/su)
     if [[ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]]; then
         SESSION_PID=$(pgrep -u "$CURRENT_USER" xfce4-session | head -n 1)
         if [[ -n "$SESSION_PID" ]]; then
@@ -188,21 +169,16 @@ if command -v xfconf-query >/dev/null 2>&1; then
         fi
     fi
 
-    # Szukamy obu standardów nazewnictwa właściwości tapety
     DESKTOP_PROPS=$(xfconf-query -c xfce4-desktop -l 2>/dev/null | grep -E "last-image$|image-path$" || true)
 
     if [[ -n "$DESKTOP_PROPS" ]]; then
-        # Usunięcie starych miniaturek i cache'u pulpitu
         rm -f ~/.cache/xfce4/desktop/* 2>/dev/null || true
 
         while IFS= read -r prop; do
-            # Ustawienie pustej/fałszywej wartości wymusza na demona odnotowanie zmiany tekstu
             xfconf-query -c xfce4-desktop -p "$prop" -t string -s "/dev/null" 2>/dev/null || true
-            # Właściwe ustawienie tapety docelowej
             xfconf-query -c xfce4-desktop -p "$prop" -t string -s "$wallpaper_PATH" 2>/dev/null || true
         done <<< "$DESKTOP_PROPS"
 
-        # Wymuszenie przeładowania tła od razu bez czekania na restart
         if command -v xfdesktop >/dev/null 2>&1; then
             xfdesktop --reload &>/dev/null || true
         fi
@@ -260,7 +236,6 @@ if [ -d "$SCRIPT_DIR/bleachbit" ]; then
     sudo cp -af "$SCRIPT_DIR/bleachbit/." /root/.config/bleachbit/
 fi
 
-# Zakończenie paska postępu (100%)
 show_progress 6 $TOTAL_STEPS "$MSG_PHASE_3"
 echo -e "\n" >&3
 

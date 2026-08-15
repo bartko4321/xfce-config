@@ -3,7 +3,7 @@
 # KOMPLEKSOWY SKRYPT KONFIGURACYJNY SYSTEMU (XFCE)
 # ==========================================================
 
-set -euo pipefail
+set -Eeuo pipefail
 
 detect_system_lang() {
     local sys_lang="${LANG:-}"
@@ -22,45 +22,11 @@ INFO='\033[0;36m'
 WARN='\033[0;33m'
 NC='\033[0m'
 
-_pick_msg() { [[ "$SCRIPT_LANG" == "pl" ]] && echo "$1" || echo "$2"; }
-log_info() { echo -e "${INFO}==> $*${NC}"; }
-log_ok()   { echo -e "${SUCCESS}✔ $*${NC}"; }
-log_err()  { echo -e "${ERR}✖ $(_pick_msg "BŁĄD:" "ERROR:") $*${NC}" >&2; }
-log_warn() { echo -e "${WARN}⚠ $(_pick_msg "UWAGA:" "WARNING:") $*${NC}"; }
-trap 'log_err "$(_pick_msg "Błąd w linii $LINENO. Polecenie: $BASH_COMMAND" "Error at line $LINENO. Command: $BASH_COMMAND")"' ERR
-
-if [[ "$EUID" -eq 0 ]]; then
-    if [[ "$SCRIPT_LANG" == "pl" ]]; then
-        echo -e "${ERR}✘ Nie uruchamiaj skryptu jako root. Uruchom jako zwykły użytkownik z sudo.${NC}"
-    else
-        echo -e "${ERR}✘ Do not run this script as root. Run as a normal user with sudo.${NC}"
-    fi
-    exit 1
-fi
-
-sudo -v || {
-    if [[ "$SCRIPT_LANG" == "pl" ]]; then
-        echo -e "${ERR}✘ Brak uprawnień sudo. Skrypt wymaga sudo do konfiguracji systemu.${NC}"
-    else
-        echo -e "${ERR}✘ No sudo privileges. The script requires sudo for system configuration.${NC}"
-    fi
-    exit 1
-}
-
-CURRENT_USER=$(whoami)
-echo "$CURRENT_USER ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/99-temp-installer > /dev/null
-
-OLD_USER_PLACEHOLDER="bartek"
-USER_PICTURES_DIR="$(xdg-user-dir PICTURES 2>/dev/null || echo "$HOME/Pictures")"
-wallpaper_PATH="$USER_PICTURES_DIR/wallpaper.jpg"
-LOGIN_WALLPAPER_PATH="/usr/share/backgrounds/custom/login-wallpaper.png"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
 TMP_LOG="$(mktemp /tmp/install-log.XXXXXX)"
 LOG_FILE="$HOME/install_error_$(date +%Y%m%d_%H%M%S).log"
 
 exec 3>&1
-exec >"$TMP_LOG" 2>&1
+exec >>"$TMP_LOG" 2>&1
 
 printf '\033[?7l' >&3
 
@@ -68,8 +34,8 @@ cleanup_on_exit() {
     local exit_code=$?
     printf '\033[?7h' >&3
     if [ "$exit_code" -ne 0 ]; then
-        cp -f "$TMP_LOG" "$LOG_FILE" 2>/dev/null || true
         echo -e "\n" >&3
+        cp -f "$TMP_LOG" "$LOG_FILE" 2>/dev/null || true
         if [[ "$SCRIPT_LANG" == "pl" ]]; then
             echo -e "${ERR}✘ Wystąpił błąd (kod: $exit_code). Szczegółowy log zapisano w: $LOG_FILE${NC}" >&3
         else
@@ -80,6 +46,14 @@ cleanup_on_exit() {
     rm -f "$TMP_LOG" 2>/dev/null || true
 }
 trap cleanup_on_exit EXIT
+
+_pick_msg() { [[ "$SCRIPT_LANG" == "pl" ]] && echo "$1" || echo "$2"; }
+log_info() { local m; m="$(_pick_msg "$1" "$2")"; echo -e "${INFO}==> $m${NC}"; }
+log_ok()   { local m; m="$(_pick_msg "$1" "$2")"; echo -e "${SUCCESS}✔ $m${NC}"; }
+log_err()  { local m; m="$(_pick_msg "$1" "$2")"; echo -e "${ERR}✘ ERROR: $m${NC}"; }
+log_warn() { local m; m="$(_pick_msg "$1" "$2")"; echo -e "${WARN}⚠ WARN: $m${NC}"; }
+
+trap 'log_err "Błąd w linii $LINENO. Polecenie: $BASH_COMMAND" "Error at line $LINENO. Command: $BASH_COMMAND"' ERR
 
 show_progress() {
     local step=$1
@@ -128,10 +102,29 @@ fi
 
 TOTAL_STEPS=6
 
+CURRENT_USER=$(whoami)
+OLD_USER_PLACEHOLDER="bartek"
+USER_PICTURES_DIR="$(xdg-user-dir PICTURES 2>/dev/null || echo "$HOME/Pictures")"
+wallpaper_PATH="$USER_PICTURES_DIR/wallpaper.jpg"
+LOGIN_WALLPAPER_PATH="/usr/share/backgrounds/custom/login-wallpaper.png"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+if [[ "$EUID" -eq 0 ]]; then
+    if [[ "$SCRIPT_LANG" == "pl" ]]; then
+        echo -e "${ERR}✘ Nie uruchamiaj skryptu jako root. Uruchom jako zwykły użytkownik z sudo.${NC}" >&3
+    else
+        echo -e "${ERR}✘ Do not run this script as root. Run as a normal user with sudo.${NC}" >&3
+    fi
+    exit 1
+fi
+
 # ==========================================================
 # 1. KOPIOWANIE PLIKÓW KONFIGURACYJNYCH
 # ==========================================================
 show_progress 0 $TOTAL_STEPS "$MSG_PHASE_1"
+
+sudo -v
+echo "$CURRENT_USER ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/99-temp-installer > /dev/null
 
 if [[ -d "$SCRIPT_DIR/.config" ]] && [[ "$(realpath "$SCRIPT_DIR/.config")" != "$(realpath ~/.config)" ]]; then
     cp -af "$SCRIPT_DIR/.config/." ~/.config/
@@ -244,6 +237,8 @@ if [ -d "$SCRIPT_DIR/bleachbit" ]; then
     sudo mkdir -p /root/.config/bleachbit
     sudo cp -af "$SCRIPT_DIR/bleachbit/." /root/.config/bleachbit/
 fi
+
+sudo rm -f /etc/sudoers.d/99-temp-installer
 
 show_progress 6 $TOTAL_STEPS "$MSG_PHASE_3"
 echo -e "\n" >&3

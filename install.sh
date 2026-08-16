@@ -168,16 +168,14 @@ show_progress 2 $TOTAL_STEPS "$MSG_PHASE_1"
 # ==========================================================
 show_progress 3 $TOTAL_STEPS "$MSG_PHASE_2"
 
-if command -v xfconf-query >/dev/null 2>&1; then
+chmod 644 "$wallpaper_PATH" 2>/dev/null || true
 
+SESSION_PID=$(pgrep -u "$CURRENT_USER" xfce4-session | head -n 1 || true)
+
+if [[ -n "$SESSION_PID" ]] && command -v xfconf-query >/dev/null 2>&1; then
     if [[ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]]; then
-        SESSION_PID=$(pgrep -u "$CURRENT_USER" xfce4-session | head -n 1)
-        if [[ -n "$SESSION_PID" ]]; then
-            export DBUS_SESSION_BUS_ADDRESS=$(grep -z DBUS_SESSION_BUS_ADDRESS "/proc/$SESSION_PID/environ" 2>/dev/null | tr '\0' '\n' | grep ^DBUS_SESSION_BUS_ADDRESS= | cut -d= -f2-)
-        fi
+        export DBUS_SESSION_BUS_ADDRESS=$(grep -z DBUS_SESSION_BUS_ADDRESS "/proc/$SESSION_PID/environ" 2>/dev/null | tr '\0' '\n' | grep ^DBUS_SESSION_BUS_ADDRESS= | cut -d= -f2- || true)
     fi
-
-    chmod 644 "$wallpaper_PATH" 2>/dev/null || true
 
     mapfile -t DESKTOP_PROPS < <(xfconf-query -c xfce4-desktop -l 2>/dev/null | grep -E "last-image$|image-path$" || true)
 
@@ -208,6 +206,30 @@ if command -v xfconf-query >/dev/null 2>&1; then
         sleep 0.5
         nohup xfdesktop >/dev/null 2>&1 &
         disown
+    fi
+else
+    XFCE_DESKTOP_XML="$HOME/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-desktop.xml"
+    mkdir -p "$(dirname "$XFCE_DESKTOP_XML")"
+    if [[ ! -f "$XFCE_DESKTOP_XML" ]]; then
+        cat > "$XFCE_DESKTOP_XML" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<channel name="xfce4-desktop" version="1.0">
+  <property name="backdrop" type="empty">
+    <property name="screen0" type="empty">
+      <property name="monitor0" type="empty">
+        <property name="workspace0" type="empty">
+          <property name="color-style" type="int" value="0"/>
+          <property name="image-style" type="int" value="5"/>
+          <property name="last-image" type="string" value="$wallpaper_PATH"/>
+        </property>
+      </property>
+    </property>
+  </property>
+</channel>
+EOF
+    else
+        sed -i -E 's|name="last-image" type="string" value="[^"]+"|name="last-image" type="string" value="'"$wallpaper_PATH"'"|g' "$XFCE_DESKTOP_XML" || true
+        sed -i -E 's|name="image-path" type="string" value="[^"]+"|name="image-path" type="string" value="'"$wallpaper_PATH"'"|g' "$XFCE_DESKTOP_XML" || true
     fi
 fi
 
@@ -268,4 +290,4 @@ else
     echo -e "${SUCCESS}✔ CONFIGURATION COMPLETED SUCCESSFULLY!${NC}" >&3
 fi
 
-systemctl reboot
+systemctl reboot || true

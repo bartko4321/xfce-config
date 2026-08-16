@@ -171,19 +171,40 @@ if command -v xfconf-query >/dev/null 2>&1; then
         fi
     fi
 
-    DESKTOP_PROPS=$(xfconf-query -c xfce4-desktop -l 2>/dev/null | grep -E "last-image$|image-path$" || true)
+    chmod 644 "$wallpaper_PATH" 2>/dev/null || true
 
-    if [[ -n "$DESKTOP_PROPS" ]]; then
-        rm -f ~/.cache/xfce4/desktop/* 2>/dev/null || true
+    mapfile -t DESKTOP_PROPS < <(xfconf-query -c xfce4-desktop -l 2>/dev/null | grep -E "last-image$|image-path$" || true)
 
-        while IFS= read -r prop; do
-            xfconf-query -c xfce4-desktop -p "$prop" -t string -s "/dev/null" 2>/dev/null || true
-            xfconf-query -c xfce4-desktop -p "$prop" -t string -s "$wallpaper_PATH" 2>/dev/null || true
-        done <<< "$DESKTOP_PROPS"
+    # Jeśli kanał xfce4-desktop nie ma jeszcze żadnych właściwości (np. pierwsze
+    # logowanie i xfdesktop nigdy wcześniej nie zapisał konfiguracji), ustaw
+    # ręcznie standardową ścieżkę - inaczej cała pętla poniżej zostałaby pominięta.
+    if [[ ${#DESKTOP_PROPS[@]} -eq 0 ]]; then
+        DESKTOP_PROPS=("/backdrop/screen0/monitor0/workspace0/last-image")
+    fi
 
-        if command -v xfdesktop >/dev/null 2>&1; then
-            xfdesktop --reload &>/dev/null || true
-        fi
+    rm -f ~/.cache/xfce4/desktop/* 2>/dev/null || true
+
+    for prop in "${DESKTOP_PROPS[@]}"; do
+        # Odpowiadający property stylu tła (np. .../workspace0/last-image -> .../workspace0/image-style)
+        style_prop="${prop%last-image}image-style"
+        [[ "$prop" == *image-path ]] && style_prop="${prop%image-path}image-style"
+
+        # Sztuczka reload: najpierw wyzeruj, odczekaj chwilę, potem ustaw właściwą ścieżkę,
+        # żeby xfdesktop na pewno wykrył zmianę (bez zdarzenia zmiany przy tej samej wartości).
+        xfconf-query -c xfce4-desktop -p "$prop" -n -t string -s "/dev/null" 2>/dev/null \
+            || xfconf-query -c xfce4-desktop -p "$prop" -t string -s "/dev/null" 2>/dev/null || true
+        sleep 0.2
+        xfconf-query -c xfce4-desktop -p "$prop" -n -t string -s "$wallpaper_PATH" 2>/dev/null \
+            || xfconf-query -c xfce4-desktop -p "$prop" -t string -s "$wallpaper_PATH" 2>/dev/null || true
+
+        # Kluczowe: jeśli image-style zostanie na 0 ("Brak"), tapeta się nie wyświetli
+        # mimo poprawnej ścieżki - zobaczymy tylko jednolite (białe) tło.
+        xfconf-query -c xfce4-desktop -p "$style_prop" -n -t int -s 5 2>/dev/null \
+            || xfconf-query -c xfce4-desktop -p "$style_prop" -t int -s 5 2>/dev/null || true
+    done
+
+    if command -v xfdesktop >/dev/null 2>&1; then
+        xfdesktop --reload &>/dev/null || true
     fi
 fi
 

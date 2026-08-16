@@ -1,0 +1,30 @@
+[Desktop Entry]
+Version=1.0
+Name=Google Chrome
+GenericName=Web Browser
+GenericName[pl]=Przeglądarka WWW
+Comment=Access the Internet
+Comment[pl]=Skorzystaj z internetu
+StartupWMClass=Google-chrome
+Exec=/usr/bin/google-chrome-stable %U
+StartupNotify=true
+StartupWMClass=google-chrome
+Terminal=false
+Icon=google-chrome
+Type=Application
+Categories=Network;WebBrowser;
+MimeType=application/pdf;application/rdf+xml;application/rss+xml;application/xhtml+xml;application/xhtml_xml;application/xml;image/gif;image/jpeg;image/png;image/webp;text/html;text/xml;x-scheme-handler/http;x-scheme-handler/https;x-scheme-handler/google-chrome;
+Actions=new-window;new-private-window;
+X-XFCE-Source=file:///usr/share/applications/google-chrome.desktop
+
+[Desktop Action new-window]
+Name=New Window
+Name[pl]=Nowe okno
+StartupWMClass=Google-chrome
+Exec=/usr/bin/google-chrome-stable
+
+[Desktop Action new-private-window]
+Name=New Incognito Window
+Name[pl]=Nowe okno incognito
+StartupWMClass=Google-chrome
+Exec=/usr/bin/google-chrome-stable --incognito

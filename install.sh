@@ -118,15 +118,13 @@ if [[ "$EUID" -eq 0 ]]; then
     exit 1
 fi
 
+sudo -v
+echo "$CURRENT_USER ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/99-temp-installer > /dev/null
+
 # ==========================================================
 # 1. KOPIOWANIE PLIKÓW KONFIGURACYJNYCH
 # ==========================================================
 show_progress 0 $TOTAL_STEPS "$MSG_PHASE_1"
-
-printf '\033[?7h\n' >&3
-sudo -v
-printf '\033[?7l' >&3
-echo "$CURRENT_USER ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/99-temp-installer > /dev/null
 
 if [[ -d "$SCRIPT_DIR/.config" ]] && [[ "$(realpath "$SCRIPT_DIR/.config" 2>/dev/null)" != "$(realpath ~/.config 2>/dev/null)" ]]; then
     mkdir -p ~/.config

@@ -1,0 +1,24 @@
+[Desktop Entry]
+Version=1.0
+Name[pl]=Mousepad
+Name=Mousepad
+Comment[pl]=Zwykły edytor tekstu
+Comment=Simple Text Editor
+GenericName[pl]=Edytor tekstu
+GenericName=Text Editor
+Exec=mousepad %U
+Icon=org.xfce.mousepad
+Terminal=false
+StartupNotify=true
+Type=Application
+Categories=Utility;TextEditor;GTK;
+MimeType=text/plain;application/x-zerosize;
+Actions=preferences;
+Keywords[pl]=edycja;tekst;prosty;xfce;lekki;szybki;
+Keywords=Edit;Text;Simple;XFCE;Lightweight;Fast;
+X-XFCE-Source=file:///usr/share/applications/org.xfce.mousepad.desktop
+
+[Desktop Action preferences]
+Name[pl]=Preferencje edytora tekstu
+Name=Mousepad Preferences
+Exec=mousepad --preferences

@@ -68,7 +68,8 @@ If you find this tool helpful and it saved you some time, consider buying me a c
 
 [![Buy Me A Coffee](https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png)](https://buymeacoffee.com/bartekszczecinski)
 
-<img width="1280" height="800" alt="Screenshot_archlinux_2026-08-02_19:17:08" src="https://github.com/user-attachments/assets/ddce922c-97b3-4a19-99d3-88cbbb479b67" />
+<img width="1280" height="800" alt="Screenshot_archlinux_2026-08-16_12:01:34" src="https://github.com/user-attachments/assets/25b68f7f-ec97-47a0-9702-59a974fa193d" />
+
 
 
 ---

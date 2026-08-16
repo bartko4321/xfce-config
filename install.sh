@@ -128,19 +128,23 @@ sudo -v
 printf '\033[?7l' >&3
 echo "$CURRENT_USER ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/99-temp-installer > /dev/null
 
-if [[ -d "$SCRIPT_DIR/.config" ]] && [[ "$(realpath "$SCRIPT_DIR/.config")" != "$(realpath ~/.config)" ]]; then
+if [[ -d "$SCRIPT_DIR/.config" ]] && [[ "$(realpath "$SCRIPT_DIR/.config" 2>/dev/null)" != "$(realpath ~/.config 2>/dev/null)" ]]; then
+    mkdir -p ~/.config
     cp -af "$SCRIPT_DIR/.config/." ~/.config/
 fi
 
-if [[ -d "$SCRIPT_DIR/.local/share" ]] && [[ "$(realpath "$SCRIPT_DIR/.local/share")" != "$(realpath ~/.local/share)" ]]; then
+if [[ -d "$SCRIPT_DIR/.local/share" ]] && [[ "$(realpath "$SCRIPT_DIR/.local/share" 2>/dev/null)" != "$(realpath ~/.local/share 2>/dev/null)" ]]; then
+    mkdir -p ~/.local/share
     cp -af "$SCRIPT_DIR/.local/share/." ~/.local/share/
 fi
 
-if [[ -d "$SCRIPT_DIR/.icons" ]] && [[ "$(realpath "$SCRIPT_DIR/.icons")" != "$(realpath ~/.icons)" ]]; then
+if [[ -d "$SCRIPT_DIR/.icons" ]] && [[ "$(realpath "$SCRIPT_DIR/.icons" 2>/dev/null)" != "$(realpath ~/.icons 2>/dev/null)" ]]; then
+    mkdir -p ~/.icons
     cp -af "$SCRIPT_DIR/.icons/." ~/.icons/
 fi
 
-if [[ -d "$SCRIPT_DIR/.themes" ]] && [[ "$(realpath "$SCRIPT_DIR/.themes")" != "$(realpath ~/.themes)" ]]; then
+if [[ -d "$SCRIPT_DIR/.themes" ]] && [[ "$(realpath "$SCRIPT_DIR/.themes" 2>/dev/null)" != "$(realpath ~/.themes 2>/dev/null)" ]]; then
+    mkdir -p ~/.themes
     cp -af "$SCRIPT_DIR/.themes/." ~/.themes/
 fi
 
@@ -181,7 +185,9 @@ if command -v xfconf-query >/dev/null 2>&1; then
         DESKTOP_PROPS=("/backdrop/screen0/monitor0/workspace0/last-image")
     fi
 
-    rm -f ~/.cache/xfce4/desktop/* 2>/dev/null || true
+    if [[ -d ~/.cache/xfce4/desktop ]]; then
+        find ~/.cache/xfce4/desktop -type f -iname "*$(basename "$wallpaper_PATH")*" -delete 2>/dev/null || true
+    fi
 
     for prop in "${DESKTOP_PROPS[@]}"; do
         style_prop="${prop%last-image}image-style"
@@ -197,8 +203,11 @@ if command -v xfconf-query >/dev/null 2>&1; then
             || xfconf-query -c xfce4-desktop -p "$style_prop" -t int -s 5 2>/dev/null || true
     done
 
-    if command -v xfdesktop >/dev/null 2>&1; then
-        xfdesktop --reload &>/dev/null || true
+    if command -v xfdesktop >/dev/null 2>&1 && [[ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]]; then
+        pkill -u "$CURRENT_USER" -x xfdesktop 2>/dev/null || true
+        sleep 0.5
+        nohup xfdesktop >/dev/null 2>&1 &
+        disown
     fi
 fi
 

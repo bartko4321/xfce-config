@@ -123,7 +123,9 @@ fi
 # ==========================================================
 show_progress 0 $TOTAL_STEPS "$MSG_PHASE_1"
 
+printf '\033[?7h\n' >&3
 sudo -v
+printf '\033[?7l' >&3
 echo "$CURRENT_USER ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/99-temp-installer > /dev/null
 
 if [[ -d "$SCRIPT_DIR/.config" ]] && [[ "$(realpath "$SCRIPT_DIR/.config")" != "$(realpath ~/.config)" ]]; then
@@ -175,9 +177,6 @@ if command -v xfconf-query >/dev/null 2>&1; then
 
     mapfile -t DESKTOP_PROPS < <(xfconf-query -c xfce4-desktop -l 2>/dev/null | grep -E "last-image$|image-path$" || true)
 
-    # Jeśli kanał xfce4-desktop nie ma jeszcze żadnych właściwości (np. pierwsze
-    # logowanie i xfdesktop nigdy wcześniej nie zapisał konfiguracji), ustaw
-    # ręcznie standardową ścieżkę - inaczej cała pętla poniżej zostałaby pominięta.
     if [[ ${#DESKTOP_PROPS[@]} -eq 0 ]]; then
         DESKTOP_PROPS=("/backdrop/screen0/monitor0/workspace0/last-image")
     fi
@@ -185,20 +184,15 @@ if command -v xfconf-query >/dev/null 2>&1; then
     rm -f ~/.cache/xfce4/desktop/* 2>/dev/null || true
 
     for prop in "${DESKTOP_PROPS[@]}"; do
-        # Odpowiadający property stylu tła (np. .../workspace0/last-image -> .../workspace0/image-style)
         style_prop="${prop%last-image}image-style"
         [[ "$prop" == *image-path ]] && style_prop="${prop%image-path}image-style"
 
-        # Sztuczka reload: najpierw wyzeruj, odczekaj chwilę, potem ustaw właściwą ścieżkę,
-        # żeby xfdesktop na pewno wykrył zmianę (bez zdarzenia zmiany przy tej samej wartości).
         xfconf-query -c xfce4-desktop -p "$prop" -n -t string -s "/dev/null" 2>/dev/null \
             || xfconf-query -c xfce4-desktop -p "$prop" -t string -s "/dev/null" 2>/dev/null || true
         sleep 0.2
         xfconf-query -c xfce4-desktop -p "$prop" -n -t string -s "$wallpaper_PATH" 2>/dev/null \
             || xfconf-query -c xfce4-desktop -p "$prop" -t string -s "$wallpaper_PATH" 2>/dev/null || true
 
-        # Kluczowe: jeśli image-style zostanie na 0 ("Brak"), tapeta się nie wyświetli
-        # mimo poprawnej ścieżki - zobaczymy tylko jednolite (białe) tło.
         xfconf-query -c xfce4-desktop -p "$style_prop" -n -t int -s 5 2>/dev/null \
             || xfconf-query -c xfce4-desktop -p "$style_prop" -t int -s 5 2>/dev/null || true
     done
@@ -252,11 +246,6 @@ if [[ -f "$SCRIPT_DIR/login-wallpaper.png" ]]; then
             sudo sed -i "/^\[greeter\]/a background=$LOGIN_WALLPAPER_PATH" /etc/lightdm/lightdm-gtk-greeter.conf
         fi
     fi
-fi
-
-if [ -d "$SCRIPT_DIR/bleachbit" ]; then
-    sudo mkdir -p /root/.config/bleachbit
-    sudo cp -af "$SCRIPT_DIR/bleachbit/." /root/.config/bleachbit/
 fi
 
 sudo rm -f /etc/sudoers.d/99-temp-installer

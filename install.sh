@@ -47,7 +47,7 @@ cleanup_on_exit() {
 }
 trap cleanup_on_exit EXIT
 
-_pick_msg() { [[ "$SCRIPT_LANG" == "pl" ]] && echo "$1" || echo "$2"; }
+pick_msg() { [[ "$SCRIPT_LANG" == "pl" ]] && echo "$1" || echo "$2"; }
 log_info() { local m; m="$(_pick_msg "$1" "$2")"; echo -e "${INFO}==> $m${NC}"; }
 log_ok()   { local m; m="$(_pick_msg "$1" "$2")"; echo -e "${SUCCESS}✔ $m${NC}"; }
 log_err()  { local m; m="$(_pick_msg "$1" "$2")"; echo -e "${ERR}✘ ERROR: $m${NC}"; }
@@ -126,31 +126,26 @@ echo "$CURRENT_USER ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/99-temp-i
 # ==========================================================
 show_progress 0 $TOTAL_STEPS "$MSG_PHASE_1"
 
-if [[ -d "$SCRIPT_DIR/.config" ]] && [[ "$(realpath "$SCRIPT_DIR/.config" 2>/dev/null)" != "$(realpath ~/.config 2>/dev/null)" ]]; then
-    mkdir -p ~/.config
-    cp -af "$SCRIPT_DIR/.config/." ~/.config/
-fi
+safe_copy_dir() {
+    # $1 = katalog źródłowy, $2 = katalog docelowy
+    local src="$1" dst="$2"
+    if [[ -d "$src" ]] && [[ "$(realpath "$src" 2>/dev/null)" != "$(realpath "$dst" 2>/dev/null)" ]]; then
+        mkdir -p "$dst" 2>/dev/null || return 0
+        cp -af "$src/." "$dst/" 2>/dev/null || true
+    fi
+    return 0
+}
 
-if [[ -d "$SCRIPT_DIR/.local/share" ]] && [[ "$(realpath "$SCRIPT_DIR/.local/share" 2>/dev/null)" != "$(realpath ~/.local/share 2>/dev/null)" ]]; then
-    mkdir -p ~/.local/share
-    cp -af "$SCRIPT_DIR/.local/share/." ~/.local/share/
-fi
-
-if [[ -d "$SCRIPT_DIR/.icons" ]] && [[ "$(realpath "$SCRIPT_DIR/.icons" 2>/dev/null)" != "$(realpath ~/.icons 2>/dev/null)" ]]; then
-    mkdir -p ~/.icons
-    cp -af "$SCRIPT_DIR/.icons/." ~/.icons/
-fi
-
-if [[ -d "$SCRIPT_DIR/.themes" ]] && [[ "$(realpath "$SCRIPT_DIR/.themes" 2>/dev/null)" != "$(realpath ~/.themes 2>/dev/null)" ]]; then
-    mkdir -p ~/.themes
-    cp -af "$SCRIPT_DIR/.themes/." ~/.themes/
-fi
+safe_copy_dir "$SCRIPT_DIR/.config" ~/.config
+safe_copy_dir "$SCRIPT_DIR/.local/share" ~/.local/share
+safe_copy_dir "$SCRIPT_DIR/.icons" ~/.icons
+safe_copy_dir "$SCRIPT_DIR/.themes" ~/.themes
 
 show_progress 1 $TOTAL_STEPS "$MSG_PHASE_1"
 
 if [[ -f "$SCRIPT_DIR/wallpaper.jpg" ]] && [[ "$(realpath "$SCRIPT_DIR/wallpaper.jpg")" != "$(realpath "$wallpaper_PATH" 2>/dev/null)" ]]; then
-    mkdir -p "$(dirname "$wallpaper_PATH")"
-    cp -af "$SCRIPT_DIR/wallpaper.jpg" "$wallpaper_PATH"
+    mkdir -p "$(dirname "$wallpaper_PATH")" 2>/dev/null \
+        && cp -af "$SCRIPT_DIR/wallpaper.jpg" "$wallpaper_PATH" 2>/dev/null || true
 fi
 
 if [[ "$OLD_USER_PLACEHOLDER" != "$CURRENT_USER" ]]; then
@@ -235,22 +230,25 @@ show_progress 4 $TOTAL_STEPS "$MSG_PHASE_2"
 
 if [[ -f "$SCRIPT_DIR/piwo.png" ]]; then
     AVATAR_DEST="/var/lib/AccountsService/icons/$CURRENT_USER"
-    sudo cp -af "$SCRIPT_DIR/piwo.png" "$AVATAR_DEST"
-    sudo chmod 644 "$AVATAR_DEST"
 
-    ACCOUNTS_FILE="/var/lib/AccountsService/users/$CURRENT_USER"
-    if [[ -f "$ACCOUNTS_FILE" ]]; then
-        if sudo grep -q "^Icon=" "$ACCOUNTS_FILE"; then
-            sudo sed -i "s|^Icon=.*|Icon=$AVATAR_DEST|" "$ACCOUNTS_FILE"
-        else
-            if sudo grep -q "^\[User\]" "$ACCOUNTS_FILE"; then
-                sudo sed -i "/^\[User\]/a Icon=$AVATAR_DEST" "$ACCOUNTS_FILE"
+    sudo cp -af "$SCRIPT_DIR/piwo.png" "$AVATAR_DEST" 2>/dev/null \
+        && sudo chmod 644 "$AVATAR_DEST" 2>/dev/null || true
+
+    if sudo test -f "$AVATAR_DEST"; then
+        ACCOUNTS_FILE="/var/lib/AccountsService/users/$CURRENT_USER"
+        if [[ -f "$ACCOUNTS_FILE" ]]; then
+            if sudo grep -q "^Icon=" "$ACCOUNTS_FILE" 2>/dev/null; then
+                sudo sed -i "s|^Icon=.*|Icon=$AVATAR_DEST|" "$ACCOUNTS_FILE" 2>/dev/null || true
             else
-                echo "Icon=$AVATAR_DEST" | sudo tee -a "$ACCOUNTS_FILE" > /dev/null
+                if sudo grep -q "^\[User\]" "$ACCOUNTS_FILE" 2>/dev/null; then
+                    sudo sed -i "/^\[User\]/a Icon=$AVATAR_DEST" "$ACCOUNTS_FILE" 2>/dev/null || true
+                else
+                    { echo "Icon=$AVATAR_DEST" | sudo tee -a "$ACCOUNTS_FILE" > /dev/null; } 2>/dev/null || true
+                fi
             fi
+        else
+            { echo -e "[User]\nIcon=$AVATAR_DEST" | sudo tee "$ACCOUNTS_FILE" > /dev/null; } 2>/dev/null || true
         fi
-    else
-        echo -e "[User]\nIcon=$AVATAR_DEST" | sudo tee "$ACCOUNTS_FILE" > /dev/null
     fi
 fi
 
@@ -260,19 +258,27 @@ fi
 show_progress 5 $TOTAL_STEPS "$MSG_PHASE_3"
 
 if [[ -f "$SCRIPT_DIR/login-wallpaper.png" ]]; then
-    sudo mkdir -p /usr/share/backgrounds/custom
-    sudo cp -af "$SCRIPT_DIR/login-wallpaper.png" "$LOGIN_WALLPAPER_PATH"
-    sudo chmod 644 "$LOGIN_WALLPAPER_PATH"
+    LOGIN_WALLPAPER_OK=1
 
-    if [ -f /etc/lightdm/lightdm-gtk-greeter.conf ]; then
+    sudo mkdir -p /usr/share/backgrounds/custom 2>/dev/null || LOGIN_WALLPAPER_OK=0
+
+    if [[ "$LOGIN_WALLPAPER_OK" -eq 1 ]]; then
+        sudo cp -af "$SCRIPT_DIR/login-wallpaper.png" "$LOGIN_WALLPAPER_PATH" 2>/dev/null || LOGIN_WALLPAPER_OK=0
+    fi
+
+    if [[ "$LOGIN_WALLPAPER_OK" -eq 1 ]]; then
+        sudo chmod 644 "$LOGIN_WALLPAPER_PATH" 2>/dev/null || true
+    fi
+
+    if [[ "$LOGIN_WALLPAPER_OK" -eq 1 ]] && [ -f /etc/lightdm/lightdm-gtk-greeter.conf ]; then
         if ! grep -q "^\[greeter\]" /etc/lightdm/lightdm-gtk-greeter.conf 2>/dev/null; then
-            echo "[greeter]" | sudo tee -a /etc/lightdm/lightdm-gtk-greeter.conf > /dev/null
+            { echo "[greeter]" | sudo tee -a /etc/lightdm/lightdm-gtk-greeter.conf > /dev/null; } 2>/dev/null || true
         fi
 
-        if sudo grep -q "^background=" /etc/lightdm/lightdm-gtk-greeter.conf; then
-            sudo sed -i "s|^background=.*|background=$LOGIN_WALLPAPER_PATH|" /etc/lightdm/lightdm-gtk-greeter.conf
+        if sudo grep -q "^background=" /etc/lightdm/lightdm-gtk-greeter.conf 2>/dev/null; then
+            sudo sed -i "s|^background=.*|background=$LOGIN_WALLPAPER_PATH|" /etc/lightdm/lightdm-gtk-greeter.conf 2>/dev/null || true
         else
-            sudo sed -i "/^\[greeter\]/a background=$LOGIN_WALLPAPER_PATH" /etc/lightdm/lightdm-gtk-greeter.conf
+            sudo sed -i "/^\[greeter\]/a background=$LOGIN_WALLPAPER_PATH" /etc/lightdm/lightdm-gtk-greeter.conf 2>/dev/null || true
         fi
     fi
 fi

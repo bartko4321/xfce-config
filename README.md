@@ -39,7 +39,7 @@ A post-installation script (`install.sh`) that automates the process of personal
 
 ### 1. Clone the repository or download the files
 ```bash
-git clone https://github.com/bartko4321/xfce-config.git
+git clone https://github.com/syscore88/xfce-config.git
 ```
 
 ### 2. Enter the downloaded folder
